@@ -1,0 +1,5 @@
+Versuchsaufbau
+Es gibt einen Lautsprecher, einen Zylinder, eine schwingbare Membran, einen Spiegel, einen Laser und eine Projektionsebene.
+Die schwingbare Membran ist an dem Zylinder befestigt. Der Lautsprecher ist an der anderen Seite des Zylinders befestigt und nach innen ausgerichtet, sodass der Schall zur Membran wandert. Der Spiegel ist auf der Membran befestigt und zwar auf der Seite, welche die Ausenseite des Zylinders ist. Entfernt vom Spiegel und entgegengesetzt zum Lautsprecher ist der Laser plaziert. Dieser strahlt auf die Membran. Er zielt auf die Mitte der Membran, genau auf den Spiegel. 
+Gibt der Lautsprecher nun ein Signal aus, schwingt die Membran und somit auch der Spiegel. Dadurch wird der Strahl des Lasers abgeleitet und erzeugt ein entsprechendes Muster auf der Projektionsebene.
+Der Einfachheit wegen ist der Laser transparent.
