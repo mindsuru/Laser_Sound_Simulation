@@ -198,7 +198,7 @@ def animatePlay(frames, membrane, fps):
         surf = ax.plot_surface(membrane.X, membrane.Y, Z, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
         return fig,
 
-    anim = FuncAnimation(fig, animate, frames=len(frames), interval=1000/(fps), repeat=True)
+    anim = FuncAnimation(fig, animate, frames=len(frames), interval=1000/(fps), repeat=False)
     plt.show()
 
 
@@ -216,44 +216,39 @@ def selectFrame(simulation_steps, desired_frames):
 def main():
     frames = []                                     # Container für die Frames
     current_time = 0                                # Initalisierung des Startzeitpunktes
-    frequency_hz = 12000                            # Frequenz der Schwingung
+    frequency_hz = 1200                            # Frequenz der Schwingung
     
-    amplitude = 300
+    amplitude = 3000
     T_ = 1/frequency_hz                             # Dauer der Echtzeitabbildung in ms
     elasticity = 1e-6
     damping = 2e-6
     radius = 30                                     # Radius der Membran
 
-    periodDuration = 0.0016                              # Dauer einer Schwingungsperiode
-    periods = 12000                                     # Anzahl der gezeigten Schwingungen
-    animationDuration = periodDuration * periods    # Dauer der gesamten Animation in Sekunden
+    periods = 10                                    # Anzahl der gezeigten Schwingungen
     
-    maxFreq = 20000
-    shortestT_ = 1/maxFreq
-    simStepPerCycle = 1000
-
-    simulation_steps = simStepPerCycle * periods
-
-
+    animationDuration = 5                           # Dauer der gesamten Animation in Sekunden
     fps = 24                                        # FPS der Animation
     num_frames = int(animationDuration * fps)            # Anzahl der Frames der gesamten Animation
-    simFrameRatio = 100                           # Anzahl der Simulationsschritte pro Frame
 
-    frame_duration = T_ / (periodDuration * fps)    # Realzeit zwischen Frames
-    simulation_dt = shortestT_ / simStepPerCycle  # Realzeit zwischen Simulationsschritt
-
+    maxFreq = 20000
+    shortestT_ = 1/maxFreq
+    simStepPerShortestCycle = 100
+    simulation_dt = shortestT_ / simStepPerShortestCycle  # Realzeit zwischen Simulationsschritt
+    simulation_steps = int((T_ * (periods / 10))/simulation_dt)
+    print('simsteps: ',simulation_steps)
     selected_frames = selectFrame(simulation_steps, num_frames)
     
-    source_position = (0, 0, 20)
+    source_position = (0, 0, 200)
     membran_center = (0, 0, 0)
     membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
 
     output_steps = max(1, int(simulation_steps / 20))
+    #print(selected_frames)
+    print('dt: ',simulation_dt)
     
-    print(simulation_dt)
     for step in range(simulation_steps):
         if step % output_steps == 0:
-            print(f"Simulation progress: {step}/{simulation_steps} steps completed.")
+            print(f"Simulation progress: {round(step/(simulation_steps/100))}/{simulation_steps/(simulation_steps/100)}% completed.")
    
         # Berechnung der externen Welle
         # distance = np.sqrt((membrane.X - source_position[0])**2 + (membrane.Y - source_position[1])**2 + (membrane.Z - source_position[2])**2)
@@ -261,6 +256,7 @@ def main():
         current_time += simulation_dt
         
         if step in selected_frames:
+            print(f"Speichere Frame bei Schritt {step}")
             X, Y, Z = membrane.get_XYZ()
             frame_data = [(X[i][j], Y[i][j], Z[i][j]) for i in range(len(Z)) for j in range(len(Z[i])) if membrane.mask[i][j]]
             frames.append(frame_data)
