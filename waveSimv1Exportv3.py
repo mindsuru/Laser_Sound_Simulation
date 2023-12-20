@@ -227,6 +227,8 @@ def main():
     #  Dämpfung der Membranschwingung
     damping = 2e-18
     radius = 30
+    #  Wellengeschwindigkeit in der Membran
+    c = 500000
 
     ## Eigenschaften der Animation
     #  Anzahl der abgebildeten Schwingungsperioden
