@@ -64,7 +64,7 @@ class MembraneSurface:
         self.immovable[R > extended_radius] = True
 
 
-    def update_Z(self, current_time, dt, elasticity, damping):
+    def update_Z(self, current_time, dt, elasticity, damping, c):
         self.Z[self.immovable] = 0
         self.velocity[self.immovable] = 0
 
@@ -90,9 +90,7 @@ class MembraneSurface:
         #print(self.F_excitation)
 
         F_totalPower = self.F_elasticity + self.F_excitation + self.F_damping
-        #print(F_totalPower)
         # Aktualisierung der Beschleunigung und der Geschwindigkeit
-        c = 900000                                          # in mm/s
         a = c**2 * (Z_xx + Z_yy) + F_totalPower
         self.velocity += a * dt
 
@@ -216,35 +214,47 @@ def selectFrame(simulation_steps, desired_frames):
 def main():
     frames = []                                     # Container für die Frames
     current_time = 0                                # Initalisierung des Startzeitpunktes
-    frequency_hz = 1200                            # Frequenz der Schwingung
-    
+
+    ## Eigenschaften der Schallwelle
+    frequency_hz = 880
     amplitude = 3000
-    T_ = 1/frequency_hz                             # Dauer der Echtzeitabbildung in ms
-    elasticity = 1e-6
-    damping = 2e-6
-    radius = 30                                     # Radius der Membran
+    #  Dauer einer Schwingungsperiode in Sekunden
+    T_ = 1/frequency_hz
 
-    periods = 10                                    # Anzahl der gezeigten Schwingungen
-    
-    animationDuration = 5                           # Dauer der gesamten Animation in Sekunden
-    fps = 24                                        # FPS der Animation
-    num_frames = int(animationDuration * fps)            # Anzahl der Frames der gesamten Animation
+    ## Eigenschaften der Membran
+    #  Elastizitätsmodul
+    elasticity = 1e-18
+    #  Dämpfung der Membranschwingung
+    damping = 2e-18
+    radius = 30
 
+    ## Eigenschaften der Animation
+    #  Anzahl der abgebildeten Schwingungsperioden
+    periods = 50
+    #  Dauer der Animation in Sekunden
+    animationDuration = 15
+    fps = 24
+    #  Anzahl der Frames der gesamten Animation
+    num_frames = int(animationDuration * fps)
+
+    ## Werte zur Berechnung der Animation
+    #  Maximale Frequenz. Kann auch verändert werden, erhöht jedoch die benötigte Rechenzeit. Grundlage zur Auflösung der Simulation.
     maxFreq = 20000
+    #  Zeit in Sekunden der kürzesten Schwingungsperiode, aktuell 0,00005 Sekunden, bzw 5*10^-5
     shortestT_ = 1/maxFreq
+    #  100 Simulationsschritte pro 5*10^⁻5
     simStepPerShortestCycle = 100
-    simulation_dt = shortestT_ / simStepPerShortestCycle  # Realzeit zwischen Simulationsschritt
+    #  Dauer eines Simulationsschrittes aktuell 5*10^-7
+    simulation_dt = shortestT_ / simStepPerShortestCycle
     simulation_steps = int((T_ * (periods / 10))/simulation_dt)
-    print('simsteps: ',simulation_steps)
+
     selected_frames = selectFrame(simulation_steps, num_frames)
     
     source_position = (0, 0, 200)
     membran_center = (0, 0, 0)
-    membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
+    membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position, c)
 
     output_steps = max(1, int(simulation_steps / 20))
-    #print(selected_frames)
-    print('dt: ',simulation_dt)
     
     for step in range(simulation_steps):
         if step % output_steps == 0:
@@ -256,7 +266,6 @@ def main():
         current_time += simulation_dt
         
         if step in selected_frames:
-            print(f"Speichere Frame bei Schritt {step}")
             X, Y, Z = membrane.get_XYZ()
             frame_data = [(X[i][j], Y[i][j], Z[i][j]) for i in range(len(Z)) for j in range(len(Z[i])) if membrane.mask[i][j]]
             frames.append(frame_data)
