@@ -228,7 +228,7 @@ def main():
     damping = 2e-18
     radius = 30
     #  Wellengeschwindigkeit in der Membran
-    c = 500000
+    waveSpeed_membrane = 500000
 
     ## Eigenschaften der Animation
     #  Anzahl der abgebildeten Schwingungsperioden
@@ -254,7 +254,7 @@ def main():
     
     source_position = (0, 0, 200)
     membran_center = (0, 0, 0)
-    membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position, c)
+    membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
 
     output_steps = max(1, int(simulation_steps / 20))
     
@@ -264,7 +264,7 @@ def main():
    
         # Berechnung der externen Welle
         # distance = np.sqrt((membrane.X - source_position[0])**2 + (membrane.Y - source_position[1])**2 + (membrane.Z - source_position[2])**2)
-        membrane.update_Z(current_time, simulation_dt, elasticity, damping)
+        membrane.update_Z(current_time, simulation_dt, elasticity, damping, waveSpeed_membrane)
         current_time += simulation_dt
         
         if step in selected_frames:
