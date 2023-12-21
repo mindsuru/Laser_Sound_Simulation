@@ -23,7 +23,7 @@ def animatePlay(frames, radius, fps):
     ax = fig.add_subplot(111, projection='3d')
     ax.set_xlim([-radius, radius])
     ax.set_ylim([-radius, radius])
-    ax.set_zlim([-radius/10000000, radius/10000000])  # Z-Achse angepasst
+    ax.set_zlim([-radius, radius])  # Z-Achse angepasst
     surf = None
 
     def animate(i):

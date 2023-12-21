@@ -3,6 +3,7 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import sys
+import cProfile
 
 def de(String):
     print(String)
@@ -85,11 +86,19 @@ class MembraneSurface:
         R = np.sqrt((self.X - self.source[0])**2 + (self.Y - self.source[1])**2 + (self.Z - self.source[2])**2)
         self.F_excitation[self.mask & ~self.immovable] = waveFunctionAir(self.amplitude, self.frequency / (2 * np.pi), R[self.mask & ~self.immovable], current_time)
 
-        #print(self.F_elasticity)
-        #print(self.F_damping)
-        #print(self.F_excitation)
+        #print('elasticity: ', self.F_elasticity)
+        #print('damping: ', self.F_damping)
+        #print('excitation: ', self.F_excitation)
 
+        contains_nan = np.isnan(self.F_excitation).any()
+        if(contains_nan):
+            sys.exit()
         F_totalPower = self.F_elasticity + self.F_excitation + self.F_damping
+
+        
+        # Hinzufügen des Gewichts in kg eines Punktes 
+        mass = 0.000000001
+        F_totalPower /= mass
         # Aktualisierung der Beschleunigung und der Geschwindigkeit
         a = c**2 * (Z_xx + Z_yy) + F_totalPower
         self.velocity += a * dt
@@ -99,68 +108,7 @@ class MembraneSurface:
         # Aktualisierung der Auslenkung
         self.Z += self.velocity * dt
 
-        #print(self.Z)
-
-    def update_ZBK(self, current_time, dt, elasticity, damping):
-        # Setze zuerst die Auslenkung der Randpunkte auf 0
-        self.Z[self.immovable] = 0
-
-        # Berechne die Auslenkung für die restlichen Punkte
-        R = np.sqrt((self.X - self.source[0])**2 + (self.Y - self.source[1])**2 + (self.Z - self.source[2])**2)
-        self.Z[self.mask & ~self.immovable] = waveFunctionAir(self.amplitude, self.frequency / (2 * np.pi), R[self.mask & ~self.immovable], current_time)
-
-        # Erstelle Slices für die zentrale Region und die Nachbarn
-        central = self.Z[1:-1, 1:-1]
-        
-        top = self.Z[:-2, 1:-1]
-        bottom = self.Z[2:, 1:-1]
-        left = self.Z[1:-1, :-2]
-        right = self.Z[1:-1, 2:]
-        
-        
-        delta_Z = np.zeros_like(central)  # Initialisiere delta_Z mit Nullen
-        delta_Z[~self.immovable[1:-1, 1:-1]] = (top + bottom + left + right)[~self.immovable[1:-1, 1:-1]] - 4 * central[~self.immovable[1:-1, 1:-1]]
-
-        # Wende das Hooke'sche Gesetz und die Dämpfung an
-        force = elasticity * delta_Z - damping * central
-
-        # Aktualisiere Z, ignoriere immovable Punkte
-        self.Z[1:-1, 1:-1][~self.immovable[1:-1, 1:-1]] += force[~self.immovable[1:-1, 1:-1]]
-
-        def plot_masked_points(self):
-            # Berechne den tatsächlichen Mittelpunkt der Maske
-            mask_center = (self.center[0] - self.radius, self.center[1] - self.radius)
-
-            masked_points = np.argwhere(self.mask)
-            masked_points = [(point[0] + mask_center[0], point[1] + mask_center[1]) for point in masked_points]
-
-            x_values_mask = [point[0] for point in masked_points]
-            y_values_mask = [point[1] for point in masked_points]
-
-            immov_points = np.argwhere(self.immovable)
-            immov_points = [(point[0] + mask_center[0], point[1] + mask_center[1]) for point in immov_points]
-
-            x_values_immov = [point[0] for point in immov_points]
-            y_values_immov = [point[1] for point in immov_points]
-
-            # Überprüfe, ob an einer Koordinate sowohl maskierte als auch unbewegliche Punkte liegen
-            overlapping_points = set(masked_points) & set(immov_points)
-
-            x_values_overlap = [point[0] for point in overlapping_points]
-            y_values_overlap = [point[1] for point in overlapping_points]
-
-            plt.scatter(x_values_mask, y_values_mask, color='blue', label='Maskierte Punkte')
-            plt.scatter(x_values_immov, y_values_immov, color='red', label='Unbewegliche Punkte')
-            plt.scatter(x_values_overlap, y_values_overlap, color='green', label='Überlappende Punkte')
-
-            plt.xlabel('X-Achse')
-            plt.ylabel('Y-Achse')
-            plt.title('Punkte im Koordinatensystem')
-            plt.grid(True)
-            plt.show()
-
-            sys.exit()
-        
+        #print(self.Z)     
 
     def get_XYZ(self):
         return self.X, self.Y, self.Z
@@ -177,7 +125,7 @@ def animatePlay(frames, membrane, fps):
     ax = fig.add_subplot(111, projection='3d')
     ax.set_xlim([-membrane.radius, membrane.radius])
     ax.set_ylim([-membrane.radius, membrane.radius])
-    ax.set_zlim([-membrane.radius/1000000000, membrane.radius/1000000000])
+    ax.set_zlim([-membrane.radius, membrane.radius])
     surf = None
 
     def animate(i):
@@ -212,29 +160,30 @@ def selectFrame(simulation_steps, desired_frames):
 
 
 def main():
+    profiler = cProfile.Profile()
     frames = []                                     # Container für die Frames
     current_time = 0                                # Initalisierung des Startzeitpunktes
 
     ## Eigenschaften der Schallwelle
     frequency_hz = 880
-    amplitude = 3000
+    amplitude = 3
     #  Dauer einer Schwingungsperiode in Sekunden
     T_ = 1/frequency_hz
 
     ## Eigenschaften der Membran
     #  Elastizitätsmodul
-    elasticity = 1e-18
+    elasticity = 1e-6
     #  Dämpfung der Membranschwingung
-    damping = 2e-18
+    damping = 0.000005
     radius = 30
     #  Wellengeschwindigkeit in der Membran
-    waveSpeed_membrane = 500000
+    waveSpeed_membrane = 700000
 
     ## Eigenschaften der Animation
     #  Anzahl der abgebildeten Schwingungsperioden
-    periods = 50
+    periods = 400
     #  Dauer der Animation in Sekunden
-    animationDuration = 15
+    animationDuration = 10
     fps = 24
     #  Anzahl der Frames der gesamten Animation
     num_frames = int(animationDuration * fps)
@@ -252,7 +201,7 @@ def main():
 
     selected_frames = selectFrame(simulation_steps, num_frames)
     
-    source_position = (0, 0, 200)
+    source_position = (0, 0, 100)
     membran_center = (0, 0, 0)
     membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
 
@@ -263,15 +212,16 @@ def main():
             print(f"Simulation progress: {round(step/(simulation_steps/100))}/{simulation_steps/(simulation_steps/100)}% completed.")
    
         # Berechnung der externen Welle
-        # distance = np.sqrt((membrane.X - source_position[0])**2 + (membrane.Y - source_position[1])**2 + (membrane.Z - source_position[2])**2)
+        profiler.enable()
         membrane.update_Z(current_time, simulation_dt, elasticity, damping, waveSpeed_membrane)
+        profiler.disable()
         current_time += simulation_dt
         
         if step in selected_frames:
             X, Y, Z = membrane.get_XYZ()
             frame_data = [(X[i][j], Y[i][j], Z[i][j]) for i in range(len(Z)) for j in range(len(Z[i])) if membrane.mask[i][j]]
             frames.append(frame_data)
-
+    profiler.print_stats()
     export_data_for_blender(frames)
     animatePlay(frames, membrane, fps)
 
