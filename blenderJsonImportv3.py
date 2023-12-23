@@ -402,7 +402,7 @@ def main():
     obj.select_set(True)
     bm = bmesh.new()
 
-    bm = create_grid_mesh(points[0], bm, 20)
+    bm = create_grid_mesh(points[0], bm, 50)
     print('create grid mesh finished')
     
     bm.to_mesh(mesh)

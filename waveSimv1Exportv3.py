@@ -21,10 +21,10 @@ def waveFunctionAir(A, f, r, t):
     r_safe = np.where(np.abs(r) < epsilon, epsilon, r)
 
     # Berechne die Wellenfunktion
-    waveFunction = A * np.cos(k * r_safe - omega * (t) + phi) / r_safe
+    waveFunction = A * np.sin(k * r_safe - omega * (t) + phi) / r_safe
 
     # Für sehr kleine r, verwende die alternative Berechnung
-    waveFunction = np.where(np.abs(r) < epsilon, A * np.cos(-omega * (t)), waveFunction)
+    waveFunction = np.where(np.abs(r) < epsilon, A * np.sin(-omega * (t)), waveFunction)
 
     
     return waveFunction
@@ -66,9 +66,10 @@ class MembraneSurface:
 
 
     def update_Z(self, current_time, dt, elasticity, damping, c):
+        
         self.Z[self.immovable] = 0
         self.velocity[self.immovable] = 0
-
+        
         Z_xx = np.zeros_like(self.Z)
         Z_yy = np.zeros_like(self.Z)
 
@@ -79,12 +80,16 @@ class MembraneSurface:
         Z_yy[1:-1, 1:-1][inner_area] = (np.roll(self.Z, -1, axis=0) - 2 * self.Z + np.roll(self.Z, 1, axis=0))[1:-1, 1:-1][inner_area] / self.dy**2
         
         # Berechnung der elastischen und Dämpfungskräfte
-        self.F_elasticity = elasticity * (Z_xx + Z_yy)
-        self.F_damping = damping * self.velocity
+        self.F_elasticity = -elasticity * (Z_xx + Z_yy)
+        self.F_damping = -damping * self.velocity
 
         # Integration der Schallquelle als Anregungsfunktion
         R = np.sqrt((self.X - self.source[0])**2 + (self.Y - self.source[1])**2 + (self.Z - self.source[2])**2)
-        self.F_excitation[self.mask & ~self.immovable] = waveFunctionAir(self.amplitude, self.frequency / (2 * np.pi), R[self.mask & ~self.immovable], current_time)
+        if True: #current_time <= 0.0004:
+            self.F_excitation[self.mask & ~self.immovable] = waveFunctionAir(self.amplitude, self.frequency / (2 * np.pi), R[self.mask & ~self.immovable], current_time)
+        else:
+            self.F_excitation = 0
+
 
         #print('elasticity: ', self.F_elasticity)
         #print('damping: ', self.F_damping)
@@ -97,7 +102,7 @@ class MembraneSurface:
 
         
         # Hinzufügen des Gewichts in kg eines Punktes 
-        mass = 0.000000001
+        mass = 0.0000000001
         F_totalPower /= mass
         # Aktualisierung der Beschleunigung und der Geschwindigkeit
         a = c**2 * (Z_xx + Z_yy) + F_totalPower
@@ -160,13 +165,12 @@ def selectFrame(simulation_steps, desired_frames):
 
 
 def main():
-    profiler = cProfile.Profile()
     frames = []                                     # Container für die Frames
     current_time = 0                                # Initalisierung des Startzeitpunktes
 
     ## Eigenschaften der Schallwelle
-    frequency_hz = 880
-    amplitude = 3
+    frequency_hz = 5000
+    amplitude = 30
     #  Dauer einer Schwingungsperiode in Sekunden
     T_ = 1/frequency_hz
 
@@ -174,21 +178,21 @@ def main():
     #  Elastizitätsmodul
     elasticity = 1e-6
     #  Dämpfung der Membranschwingung
-    damping = 0.000005
-    radius = 30
+    damping = 4e-7
+    radius = 40
     #  Wellengeschwindigkeit in der Membran
-    waveSpeed_membrane = 700000
+    waveSpeed_membrane = 343000/2
 
     ## Eigenschaften der Animation
     #  Anzahl der abgebildeten Schwingungsperioden
-    periods = 400
+    periods = 20
     #  Dauer der Animation in Sekunden
     animationDuration = 10
     fps = 24
     #  Anzahl der Frames der gesamten Animation
     num_frames = int(animationDuration * fps)
 
-    ## Werte zur Berechnung der Animation
+    ## Werte zur Berechnung der Simulation
     #  Maximale Frequenz. Kann auch verändert werden, erhöht jedoch die benötigte Rechenzeit. Grundlage zur Auflösung der Simulation.
     maxFreq = 20000
     #  Zeit in Sekunden der kürzesten Schwingungsperiode, aktuell 0,00005 Sekunden, bzw 5*10^-5
@@ -197,31 +201,37 @@ def main():
     simStepPerShortestCycle = 100
     #  Dauer eines Simulationsschrittes aktuell 5*10^-7
     simulation_dt = shortestT_ / simStepPerShortestCycle
-    simulation_steps = int((T_ * (periods / 10))/simulation_dt)
+    simulation_steps = int((T_ * (periods))/simulation_dt)
 
     selected_frames = selectFrame(simulation_steps, num_frames)
     
-    source_position = (0, 0, 100)
+    source_position = (0, 0, 10)
     membran_center = (0, 0, 0)
     membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
 
     output_steps = max(1, int(simulation_steps / 20))
+
+    #print('T_: ', T_)
+    #print('simSteps: ', simulation_steps)
+    #print('dt: ', simulation_dt)
+    #print('selected frames: ', selected_frames)
+    #sys.exit()
     
     for step in range(simulation_steps):
         if step % output_steps == 0:
             print(f"Simulation progress: {round(step/(simulation_steps/100))}/{simulation_steps/(simulation_steps/100)}% completed.")
+            #print(current_time)
    
         # Berechnung der externen Welle
-        profiler.enable()
+        #profiler.enable()
         membrane.update_Z(current_time, simulation_dt, elasticity, damping, waveSpeed_membrane)
-        profiler.disable()
+        #profiler.disable()
         current_time += simulation_dt
         
         if step in selected_frames:
             X, Y, Z = membrane.get_XYZ()
             frame_data = [(X[i][j], Y[i][j], Z[i][j]) for i in range(len(Z)) for j in range(len(Z[i])) if membrane.mask[i][j]]
             frames.append(frame_data)
-    profiler.print_stats()
     export_data_for_blender(frames)
     animatePlay(frames, membrane, fps)
 
