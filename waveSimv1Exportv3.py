@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import sys
 import cProfile
+import time
+import pstats
 
 def de(String):
     print(String)
@@ -90,16 +92,10 @@ class MembraneSurface:
         else:
             self.F_excitation = 0
 
-
-        #print('elasticity: ', self.F_elasticity)
-        #print('damping: ', self.F_damping)
-        #print('excitation: ', self.F_excitation)
-
         contains_nan = np.isnan(self.F_excitation).any()
         if(contains_nan):
             sys.exit()
         F_totalPower = self.F_elasticity + self.F_excitation + self.F_damping
-
         
         # Hinzufügen des Gewichts in kg eines Punktes 
         mass = 0.0000000001
@@ -165,12 +161,13 @@ def selectFrame(simulation_steps, desired_frames):
 
 
 def main():
+    profiler = cProfile.Profile()
     frames = []                                     # Container für die Frames
     current_time = 0                                # Initalisierung des Startzeitpunktes
 
     ## Eigenschaften der Schallwelle
-    frequency_hz = 5000
-    amplitude = 30
+    frequency_hz = 14000
+    amplitude = 100
     #  Dauer einer Schwingungsperiode in Sekunden
     T_ = 1/frequency_hz
 
@@ -179,13 +176,13 @@ def main():
     elasticity = 1e-6
     #  Dämpfung der Membranschwingung
     damping = 4e-7
-    radius = 40
+    radius = 20
     #  Wellengeschwindigkeit in der Membran
-    waveSpeed_membrane = 343000/2
+    waveSpeed_membrane = 343000*4
 
     ## Eigenschaften der Animation
     #  Anzahl der abgebildeten Schwingungsperioden
-    periods = 20
+    periods = 10
     #  Dauer der Animation in Sekunden
     animationDuration = 10
     fps = 24
@@ -205,33 +202,51 @@ def main():
 
     selected_frames = selectFrame(simulation_steps, num_frames)
     
-    source_position = (0, 0, 10)
+    source_position = (0, 0, 20)
     membran_center = (0, 0, 0)
     membrane = MembraneSurface(membran_center, radius, frequency_hz, amplitude, source_position)
 
-    output_steps = max(1, int(simulation_steps / 20))
-
-    #print('T_: ', T_)
+    progressResolution = 100
+    output_steps = max(1, int(simulation_steps / progressResolution))
+    start = time.time()
+    last_tenth = 'unknown'
+    
+    #print(start)
     #print('simSteps: ', simulation_steps)
-    #print('dt: ', simulation_dt)
-    #print('selected frames: ', selected_frames)
-    #sys.exit()
     
     for step in range(simulation_steps):
         if step % output_steps == 0:
-            print(f"Simulation progress: {round(step/(simulation_steps/100))}/{simulation_steps/(simulation_steps/100)}% completed.")
-            #print(current_time)
+            actual_time = round(time.time(), 2)
+            time_elapsed = round(actual_time-round(start, 2), 2)
+            
+            if isinstance(last_tenth, str):
+                estimatedEnd = last_tenth
+            else:
+                last_tenth = round(actual_time - last_tenth, 2)
+                estimatedEnd = round((progressResolution - (step/(simulation_steps) * progressResolution)), 2)
+                estimatedEnd = round(estimatedEnd * last_tenth, 2)
+                
+            progress = round(step / (simulation_steps / progressResolution))
+            estimatedEnd_formatted = f"{estimatedEnd:5.2f}s" if not isinstance(estimatedEnd, str) else estimatedEnd
+            print(f"Simulation progress: {progress:3d}/100.0% completed. Elapsed time: {time_elapsed:5.2f}s, estimated remaining time: {estimatedEnd_formatted}")
+
+            last_tenth = actual_time
    
         # Berechnung der externen Welle
-        #profiler.enable()
+        profiler.enable()
         membrane.update_Z(current_time, simulation_dt, elasticity, damping, waveSpeed_membrane)
-        #profiler.disable()
+        profiler.disable()
         current_time += simulation_dt
         
         if step in selected_frames:
             X, Y, Z = membrane.get_XYZ()
             frame_data = [(X[i][j], Y[i][j], Z[i][j]) for i in range(len(Z)) for j in range(len(Z[i])) if membrane.mask[i][j]]
             frames.append(frame_data)
+    
+    ende = time.time()
+    
+    stats = pstats.Stats(profiler).dump_stats('profiler_results.prof')
+
     export_data_for_blender(frames)
     animatePlay(frames, membrane, fps)
 
